@@ -166,7 +166,7 @@ export const cmdEditTable = "mssql.editTable";
 export const cmdEditConnection = "mssql.editConnection";
 
 export const cmdLaunchUserFeedback = "mssql.userFeedback";
-
+export const cmdVisualizeSchema = "mssql.visualizeSchema";
 export const piiLogging = "piiLogging";
 
 export const mssqlPiiLogging = "mssql.piiLogging";
@@ -351,7 +351,10 @@ export const configEnableNewQueryResultFeature =
 	"mssql.enableNewQueryResultFeature";
 
 export const configOpenQueryResultsInTabByDefaultDoNotShowPrompt =
-	"mssql.openQueryResultsInTabByDefaultDoNotShowPrompt";
+    "mssql.openQueryResultsInTabByDefaultDoNotShowPrompt";
+export const configAutoColumnSizing = "resultsGrid.autoSizeColumns";
+export const configAutoDisableNonTSqlLanguageService =
+    "mssql.autoDisableNonTSqlLanguageService";
 
 // ToolsService Constants
 export const serviceInstallingTo = "Installing SQL tools service to";
