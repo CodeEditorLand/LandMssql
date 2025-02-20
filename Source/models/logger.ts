@@ -4,184 +4,188 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as os from "os";
-import { OutputChannel } from "vscode";
-
 import { ILogger } from "./interfaces";
 import * as Utils from "./utils";
+import { OutputChannel } from "vscode";
 
+/** Logger levels, ordered from most critical to most verbose */
 export enum LogLevel {
-	"Pii",
-	"Off",
-	"Critical",
-	"Error",
-	"Warning",
-	"Information",
-	"Verbose",
-	"All",
+    Pii = 0,
+    Off = 1,
+    Critical = 2,
+    Error = 3,
+    Warning = 4,
+    Information = 5,
+    Verbose = 6,
+    All = 7,
 }
 
 /*
  * Logger class handles logging messages using the Util functions.
  */
 export class Logger implements ILogger {
-	private _writer: (message: string) => void;
+    private _indentLevel: number = 0;
+    private _indentSize: number = 4;
+    private _atLineStart: boolean = true;
 
-	private _piiLogging: boolean = false;
+    constructor(
+        private _writer: (message: string) => void,
+        private _logLevel: LogLevel,
+        private _piiLogging: boolean,
+        private _prefix?: string,
+    ) {}
 
-	private _prefix: string;
+    public static create(channel: OutputChannel, prefix?: string): Logger {
+        const logLevel: LogLevel =
+            LogLevel[Utils.getConfigTracingLevel() as keyof typeof LogLevel];
+        const pii = Utils.getConfigPiiLogging();
 
-	private _logLevel: LogLevel;
+        function logToOutputChannel(message: string): void {
+            channel.append(message);
+        }
 
-	private _indentLevel: number = 0;
+        const logger = new Logger(logToOutputChannel, logLevel, pii, prefix);
 
-	private _indentSize: number = 4;
+        return logger;
+    }
 
-	private _atLineStart: boolean = false;
+    /**
+     * Logs a message containing PII (when enabled). Provides the ability to sanitize or shorten values to hide information or reduce the amount logged.
+     * @param msg The initial message to log
+     * @param objsToSanitize Set of objects we want to sanitize
+     * @param stringsToShorten Set of strings to shorten
+     * @param vals Any other values to add on to the end of the log message
+     */
+    public piiSanitized(
+        msg: any,
+        objsToSanitize: { name: string; objOrArray: any | any[] }[],
+        stringsToShorten: { name: string; value: string }[],
+        ...vals: any[]
+    ): void {
+        if (this.piiLogging) {
+            msg = [
+                msg,
+                ...objsToSanitize?.map(
+                    (obj) => `${obj.name}=${sanitize(obj.objOrArray)}`,
+                ),
+                ...stringsToShorten.map(
+                    (str) => `${str.name}=${shorten(str.value)}`,
+                ),
+            ].join(" ");
+            this.write(LogLevel.Pii, msg, ...vals);
+        }
+    }
 
-	constructor(
-		writer: (message: string) => void,
-		logLevel: LogLevel,
-		piiLogging: boolean,
-		prefix?: string,
-	) {
-		this._writer = writer;
+    /**
+     * Logs a message containing PII (when enabled).
+     * @param msg The initial message to log
+     * @param vals Any other values to add on to the end of the log message
+     */
+    public pii(msg: any, ...vals: any[]): void {
+        if (this.piiLogging) {
+            this.write(LogLevel.Pii, msg, ...vals);
+        }
+    }
 
-		this._logLevel = logLevel;
+    public set piiLogging(val: boolean) {
+        this._piiLogging = val;
+    }
 
-		this._piiLogging = piiLogging;
+    public get piiLogging(): boolean {
+        return this._piiLogging;
+    }
 
-		this._prefix = prefix;
-	}
+    /** If `mssql.logDebug` is enabled, prints the message to the developer console */
+    public logDebug(message: string): void {
+        Utils.logDebug(message);
+    }
 
-	public static create(channel: OutputChannel) {
-		const logLevel: LogLevel =
-			LogLevel[Utils.getConfigTracingLevel() as keyof typeof LogLevel];
+    public critical(msg: any, ...vals: any[]): void {
+        this.write(LogLevel.Critical, msg, ...vals);
+        console.error(msg);
+    }
 
-		const pii = Utils.getConfigPiiLogging();
+    public error(msg: any, ...vals: any[]): void {
+        this.write(LogLevel.Error, msg, ...vals);
+        console.error(msg);
+    }
 
-		return new Logger((text) => channel.append(text), logLevel, pii);
-	}
+    public warn(msg: any, ...vals: any[]): void {
+        this.write(LogLevel.Warning, msg, ...vals);
+        console.warn(msg);
+    }
 
-	/**
-	 * Logs a message containing PII (when enabled). Provides the ability to sanitize or shorten values to hide information or reduce the amount logged.
-	 * @param msg The initial message to log
-	 * @param objsToSanitize Set of objects we want to sanitize
-	 * @param stringsToShorten Set of strings to shorten
-	 * @param vals Any other values to add on to the end of the log message
-	 */
-	public piiSanitized(
-		msg: any,
-		objsToSanitize: { name: string; objOrArray: any | any[] }[],
-		stringsToShorten: { name: string; value: string }[],
-		...vals: any[]
-	): void {
-		if (this.piiLogging) {
-			msg = [
-				msg,
-				...objsToSanitize?.map(
-					(obj) => `${obj.name}=${sanitize(obj.objOrArray)}`,
-				),
-				...stringsToShorten.map(
-					(str) => `${str.name}=${shorten(str.value)}`,
-				),
-			].join(" ");
+    public info(msg: any, ...vals: any[]): void {
+        this.write(LogLevel.Information, msg, ...vals);
+    }
 
-			this.write(LogLevel.Pii, msg, vals);
-		}
-	}
+    public verbose(msg: any, ...vals: any[]): void {
+        this.write(LogLevel.Verbose, msg, ...vals);
+    }
 
-	/**
-	 * Logs a message containing PII (when enabled).
-	 * @param msg The initial message to log
-	 * @param vals Any other values to add on to the end of the log message
-	 */
-	public pii(msg: any, ...vals: any[]): void {
-		if (this.piiLogging) {
-			this.write(LogLevel.Pii, msg, vals);
-		}
-	}
+    /** Outputs a message with priority "All" (most verbose) */
+    public log(msg: any, ...vals: any[]): void {
+        this.write(LogLevel.All, msg, ...vals);
+    }
 
-	public set piiLogging(val: boolean) {
-		this._piiLogging = val;
-	}
+    public increaseIndent(): void {
+        this._indentLevel += 1;
+    }
 
-	public get piiLogging(): boolean {
-		return this._piiLogging;
-	}
+    public decreaseIndent(): void {
+        if (this._indentLevel > 0) {
+            this._indentLevel -= 1;
+        }
+    }
 
-	public shouldLog(logLevel: LogLevel): Boolean {
-		return logLevel <= this._logLevel;
-	}
+    /** Prints a message directly, regardless of log level */
+    public append(message?: string): void {
+        message = message || "";
+        this.appendCore(message);
+    }
 
-	private write(logLevel: LogLevel, msg: any, ...vals: any[]): void {
-		if (this.shouldLog(logLevel) || logLevel === LogLevel.Pii) {
-			const fullMessage = `[${LogLevel[logLevel]}]: ${msg} - ${vals.map((v) => JSON.stringify(v)).join(" - ")}`;
+    /** Prints a message directly, regardless of log level */
+    public appendLine(message?: string): void {
+        message = message || "";
+        this.appendCore(message + os.EOL);
+        this._atLineStart = true;
+    }
 
-			this.appendLine(fullMessage);
-		}
-	}
+    private shouldLog(logLevel: LogLevel): Boolean {
+        return logLevel <= this._logLevel;
+    }
 
-	public logDebug(message: string): void {
-		Utils.logDebug(message);
-	}
+    private write(logLevel: LogLevel, msg: any, ...vals: any[]): void {
+        if (this.shouldLog(logLevel) || logLevel === LogLevel.Pii) {
+            let fullMessage = `[${LogLevel[logLevel]}]: ${msg}`;
 
-	public log(msg: any, ...vals: any[]): void {
-		this.write(LogLevel.All, msg, vals);
-	}
+            // if present, append additional values to the message
+            if (vals.length > 0) {
+                fullMessage += ` - ${vals.map((v) => JSON.stringify(v)).join(" - ")}`;
+            }
 
-	public error(msg: any, ...vals: any[]): void {
-		this.write(LogLevel.Error, msg, vals);
-	}
+            this.appendLine(fullMessage);
+        }
+    }
 
-	public info(msg: any, ...vals: any[]): void {
-		this.write(LogLevel.Information, msg, vals);
-	}
+    private appendCore(message: string): void {
+        if (this._atLineStart) {
+            if (this._indentLevel > 0) {
+                const indent = " ".repeat(this._indentLevel * this._indentSize);
+                this._writer(indent);
+            }
 
-	public verbose(msg: any, ...vals: any[]): void {
-		this.write(LogLevel.Verbose, msg, vals);
-	}
+            this._writer(`[${new Date().toLocaleTimeString()}] `);
 
-	private appendCore(message: string): void {
-		if (this._atLineStart) {
-			if (this._indentLevel > 0) {
-				const indent = " ".repeat(this._indentLevel * this._indentSize);
+            if (this._prefix) {
+                this._writer(`[${this._prefix}] `);
+            }
 
-				this._writer(indent);
-			}
+            this._atLineStart = false;
+        }
 
-			if (this._prefix) {
-				this._writer(`[${this._prefix}] `);
-			}
-
-			this._atLineStart = false;
-		}
-
-		this._writer(message);
-	}
-
-	public increaseIndent(): void {
-		this._indentLevel += 1;
-	}
-
-	public decreaseIndent(): void {
-		if (this._indentLevel > 0) {
-			this._indentLevel -= 1;
-		}
-	}
-
-	public append(message?: string): void {
-		message = message || "";
-
-		this.appendCore(message);
-	}
-
-	public appendLine(message?: string): void {
-		message = message || "";
-
-		this.appendCore(message + os.EOL);
-
-		this._atLineStart = true;
-	}
+        this._writer(message);
+    }
 }
 
 /**
@@ -190,29 +194,23 @@ export class Logger implements ILogger {
  * @returns The stringified version of the sanitized object
  */
 function sanitize(objOrArray: any): string {
-	if (Array.isArray(objOrArray)) {
-		return JSON.stringify(objOrArray.map((o) => sanitizeImpl(o)));
-	} else {
-		return sanitizeImpl(objOrArray);
-	}
+    if (Array.isArray(objOrArray)) {
+        return JSON.stringify(objOrArray.map((o) => sanitizeImpl(o)));
+    } else {
+        return sanitizeImpl(objOrArray);
+    }
 }
 
 function sanitizeImpl(obj: any): string {
-	obj = Object.assign({}, obj);
-
-	delete obj.domains; // very long and not really useful
-	// shorten all tokens since we don't usually need the exact values and there's security concerns if they leaked
-	shortenIfExists(obj, "token");
-
-	shortenIfExists(obj, "refresh_token");
-
-	shortenIfExists(obj, "access_token");
-
-	shortenIfExists(obj, "code");
-
-	shortenIfExists(obj, "id_token");
-
-	return JSON.stringify(obj);
+    obj = Object.assign({}, obj);
+    delete obj.domains; // very long and not really useful
+    // shorten all tokens since we don't usually need the exact values and there's security concerns if they leaked
+    shortenIfExists(obj, "token");
+    shortenIfExists(obj, "refresh_token");
+    shortenIfExists(obj, "access_token");
+    shortenIfExists(obj, "code");
+    shortenIfExists(obj, "id_token");
+    return JSON.stringify(obj);
 }
 
 /**
@@ -221,9 +219,9 @@ function sanitizeImpl(obj: any): string {
  * @param property The name of the property to shorten - if it exists
  */
 function shortenIfExists(obj: any, property: string): void {
-	if (obj[property]) {
-		obj[property] = shorten(obj[property]);
-	}
+    if (obj[property]) {
+        obj[property] = shorten(obj[property]);
+    }
 }
 
 /**
@@ -234,10 +232,9 @@ function shortenIfExists(obj: any, property: string): void {
  * @returns Shortened string in the form 'xxx...xxx'
  */
 function shorten(str?: string): string | undefined {
-	// Don't shorten if adding the ... wouldn't make the string shorter
-	if (!str || str.length < 10) {
-		return str;
-	}
-
-	return `${str.substr(0, 3)}...${str.slice(-3)}`;
+    // Don't shorten if adding the ... wouldn't make the string shorter
+    if (!str || str.length < 10) {
+        return str;
+    }
+    return `${str.substr(0, 3)}...${str.slice(-3)}`;
 }
