@@ -21,6 +21,7 @@ import { copied, scriptCopiedToClipboard } from "../constants/locConstants";
 import { UserSurvey } from "../nps/userSurvey";
 import { ObjectExplorerProvider } from "../objectExplorer/objectExplorerProvider";
 import { getErrorMessage } from "../utils/utils";
+import VscodeWrapper from "../controllers/vscodeWrapper";
 
 export class TableDesignerWebviewController extends ReactWebviewPanelController<
     designer.TableDesignerWebviewState,
@@ -31,6 +32,7 @@ export class TableDesignerWebviewController extends ReactWebviewPanelController<
 
     constructor(
         context: vscode.ExtensionContext,
+        vscodeWrapper: VscodeWrapper,
         private _tableDesignerService: designer.ITableDesignerService,
         private _connectionManager: ConnectionManager,
         private _untitledSqlDocumentService: UntitledSqlDocumentService,
@@ -40,6 +42,8 @@ export class TableDesignerWebviewController extends ReactWebviewPanelController<
     ) {
         super(
             context,
+            vscodeWrapper,
+            "tableDesigner",
             "tableDesigner",
             {
                 apiState: {
@@ -371,11 +375,14 @@ export class TableDesignerWebviewController extends ReactWebviewPanelController<
                         correlationId: this._correlationId,
                     },
                 );
+
                 state = {
                     ...state,
                     apiState: {
                         ...state.apiState,
-                        previewState: designer.LoadState.Loaded,
+                        previewState: previewReport.schemaValidationError
+                            ? designer.LoadState.Error
+                            : designer.LoadState.Loaded,
                         publishState: designer.LoadState.NotStarted,
                     },
                     generatePreviewReportResult: previewReport,

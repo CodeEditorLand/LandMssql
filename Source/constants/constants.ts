@@ -77,7 +77,7 @@ export const cmdPauseQueryHistory = "mssql.pauseQueryHistoryCapture";
 export const cmdCommandPaletteQueryHistory = "mssql.commandPaletteQueryHistory";
 
 export const cmdNewQuery = "mssql.newQuery";
-
+export const cmdSchemaCompare = "mssql.schemaCompare";
 export const cmdManageConnectionProfiles = "mssql.manageProfiles";
 
 export const cmdClearPooledConnections = "mssql.clearPooledConnections";
@@ -114,8 +114,8 @@ export const cmdObjectExplorerEnableGroupBySchemaCommand =
 	"mssql.objectExplorer.enableGroupBySchema";
 
 export const cmdObjectExplorerDisableGroupBySchemaCommand =
-	"mssql.objectExplorer.disableGroupBySchema";
-
+    "mssql.objectExplorer.disableGroupBySchema";
+export const cmdEnableRichExperiencesCommand = "mssql.enableRichExperiences";
 export const cmdScriptSelect = "mssql.scriptSelect";
 
 export const cmdScriptCreate = "mssql.scriptCreate";
