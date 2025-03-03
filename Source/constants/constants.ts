@@ -29,9 +29,8 @@ export const outputChannelName = "MSSQL";
 export const connectionConfigFilename = "settings.json";
 
 export const connectionsArrayName = "connections";
-
-export const disconnectedServerLabel = "disconnectedServer";
-
+export const connectionGroupsArrayName = "connectionGroups";
+export const disconnectedServerNodeType = "disconnectedServer";
 export const serverLabel = "Server";
 
 export const folderLabel = "Folder";

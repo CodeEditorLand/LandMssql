@@ -247,7 +247,7 @@ declare module "vscode-mssql" {
 	}
 
 	/**
-	 * Information about a database connection
+	 * Information about a database connection necessary for connecting to a database.
 	 */
 	export interface IConnectionInfo {
 		/**
