@@ -119,7 +119,7 @@
         "@vscode/test-cli": "^0.0.11",
         "@vscode/test-electron": "^2.5.2",
         "@vscode/vsce": "^3.5.0",
-        "@xmldom/xmldom": "0.9.8",
+        "@xmldom/xmldom": "0.9.9",
         "@xyflow/react": "^12.6.4",
         "angular-in-memory-web-api": "0.20.0",
         "angular2-slickgrid": "github:microsoft/angular2-slickgrid#1.4.7",
